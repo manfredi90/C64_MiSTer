@@ -19,6 +19,7 @@ port(
 	vsync : in std_logic;
 	ntsc  : in std_logic;
 	wide  : in std_logic;
+	noborder : in std_logic;
 	hsync_out : out std_logic;
 	vsync_out : out std_logic;
 	hblank : out std_logic;
@@ -32,8 +33,17 @@ architecture struct of video_sync is
 	signal vsync_r : std_logic;
 	signal hsync_r : std_logic;
 	signal hsync_r0 : std_logic;
+	signal hblank_i : std_logic;
+	signal vblank_i : std_logic;
+	signal hblank_nb : std_logic_vector(2 downto 0);
+	signal vblank_nb : std_logic_vector(2 downto 0);
 
 begin
+
+-- noborder: active display window only (40 columns x 25 rows).
+-- VIC pixels change 2 clocks after dot_count, so the window is delayed to match.
+hblank <= hblank_nb(0) when noborder = '1' else hblank_i;
+vblank <= vblank_nb(0) when noborder = '1' else vblank_i;
 
 process(clk32)
 	variable  dot_count : integer range 0 to 1023 := 0;
@@ -50,6 +60,9 @@ process(clk32)
 	end if;
 
 	if rising_edge(clk32) then
+		hblank_nb(1 downto 0) <= hblank_nb(2 downto 1);
+		vblank_nb(1 downto 0) <= vblank_nb(2 downto 1);
+
 		if clk_cnt = "00" and pause = '0' then
 			vsync_r <= vsync;
 			hsync_r <= hsync;
@@ -77,15 +90,20 @@ process(clk32)
 					if line_count = 004 then vsync_out <= '0'; end if;
 				end if;
 
-				if line_count = 000 then vblank <= '1'; end if;
-				if line_count = 013 then vblank <= '0'; end if;
+				if line_count = 000 then vblank_i <= '1'; end if;
+				if line_count = 013 then vblank_i <= '0'; end if;
+
+				if line_count = 238 then vblank_nb(2) <= '1'; end if;
+				if line_count = 038 then vblank_nb(2) <= '0'; end if;
+				if dot_count  = 475 then hblank_nb(2) <= '1'; end if;
+				if dot_count  = 155 then hblank_nb(2) <= '0'; end if;
 
 				if wide = '0' then
-					if dot_count  = 516 then hblank <= '1'; end if;
-					if dot_count  = 112 then hblank <= '0'; end if;
+					if dot_count  = 516 then hblank_i <= '1'; end if;
+					if dot_count  = 112 then hblank_i <= '0'; end if;
 				else
-					if dot_count  = 496 then hblank <= '1'; end if;
-					if dot_count  = 132 then hblank <= '0'; end if;
+					if dot_count  = 496 then hblank_i <= '1'; end if;
+					if dot_count  = 132 then hblank_i <= '0'; end if;
 				end if;
 			else
 				if dot_count     = 048 then hsync_out <= '0'; end if;
@@ -94,15 +112,20 @@ process(clk32)
 					if line_count = 311 then vsync_out <= '0'; end if;
 				end if;
 
-				if line_count = 298 then vblank <= '1'; end if;
-				if line_count = 028 then vblank <= '0'; end if;
+				if line_count = 298 then vblank_i <= '1'; end if;
+				if line_count = 028 then vblank_i <= '0'; end if;
+
+				if line_count = 262 then vblank_nb(2) <= '1'; end if;
+				if line_count = 062 then vblank_nb(2) <= '0'; end if;
+				if dot_count  = 459 then hblank_nb(2) <= '1'; end if;
+				if dot_count  = 139 then hblank_nb(2) <= '0'; end if;
 
 				if wide = '0' then
-					if dot_count  = 489 then hblank <= '1'; end if;
-					if dot_count  = 107 then hblank <= '0'; end if;
+					if dot_count  = 489 then hblank_i <= '1'; end if;
+					if dot_count  = 107 then hblank_i <= '0'; end if;
 				else
-					if dot_count  = 463 then hblank <= '1'; end if;
-					if dot_count  = 133 then hblank <= '0'; end if;
+					if dot_count  = 463 then hblank_i <= '1'; end if;
+					if dot_count  = 133 then hblank_i <= '0'; end if;
 				end if;
 			end if;
 

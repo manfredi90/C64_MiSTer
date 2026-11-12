@@ -1,0 +1,81 @@
+name: Build core (c64-noborder)
+
+# Compiles the core with Quartus 17.0.2 Lite on every push to c64-noborder, with
+# several fitter seeds in parallel, keeps the build with the best worst-case
+# slack and stores it on the build-output-noborder branch.
+on:
+  push:
+    branches: [ "c64-noborder" ]
+    paths: [ "rtl/**", "sys/**", "*.sv", "*.qsf", "*.qpf", "*.sdc", "files.qip", ".github/workflows/build-noborder.yml" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        seed: [ 1, 2, 3, 4 ]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set the fitter seed
+        run: sed -i 's/^set_global_assignment -name SEED .*/set_global_assignment -name SEED ${{ matrix.seed }}/' C64.qsf
+
+      - name: Compile with Quartus 17.0.2 Lite
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE":/project -w /project \
+            theypsilon/quartus-lite-c5:17.0.2 \
+            quartus_sh --flow compile C64.qpf
+
+      - name: Collect output
+        run: |
+          mkdir -p out
+          cp output_files/C64.rbf out/
+          cp output_files/*.rpt output_files/*.summary out/ 2>/dev/null || true
+          awk '/^Slack/ {print $3}' output_files/C64.sta.summary | sort -g | head -1 > out/WORST_SLACK
+          echo "seed ${{ matrix.seed }}: worst slack $(cat out/WORST_SLACK)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: seed-${{ matrix.seed }}
+          path: out
+
+  pick:
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: seeds
+
+      - name: Keep the seed with the best slack
+        run: |
+          best=""; bests=""
+          for d in seeds/seed-*; do
+            [ -f "$d/WORST_SLACK" ] && [ -f "$d/C64.rbf" ] || continue
+            s=$(cat "$d/WORST_SLACK"); echo "$d: $s"
+            if [ -z "$best" ] || awk -v a="$s" -v b="$bests" 'BEGIN{exit !(a>b)}'; then best="$d"; bests="$s"; fi
+          done
+          [ -n "$best" ] || { echo "no build"; exit 1; }
+          echo "best: $best ($bests)"
+          mkdir -p out
+          cp "$best"/*.rpt "$best"/*.summary out/ 2>/dev/null || true
+          cp "$best/C64.rbf" "out/C64_noborder_$(date +%Y%m%d)_${GITHUB_SHA::7}.rbf"
+          echo "${GITHUB_SHA}" > out/COMMIT
+          echo "${best#seeds/seed-} $bests" > out/SEED
+
+      - name: Push to build-output-noborder branch
+        run: |
+          cd out
+          git init -q
+          git checkout -q -b build-output-noborder
+          git add -A
+          git -c user.name="github-actions" -c user.email="github-actions@users.noreply.github.com" \
+            commit -q -m "Build output of ${GITHUB_SHA::7} (run ${GITHUB_RUN_ID})"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" build-output-noborder

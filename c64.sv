@@ -63,7 +63,7 @@ assign HDMI_BOB_DEINT = 0;
 //
 // 6     7         8         9         10        11        12
 // 45678901234567890123456789012345 67890123456789012345678901234567
-// XXXXXXXXXXXXXXXXXXXXXXXXX  XXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXX  XXXXXXXXX
 //                            ^^^^^ 91=Counter Reset, 92=Counter,
 //                                  93=Rewind, 94=Fast Forward, 95=Stop
 
@@ -95,6 +95,7 @@ localparam CONF_STR = {
 	"P1O[84:82],Palette,Colodore,Ultimate,Pepto-PAL,Vice,Vice6569R1,Vice6569R5,Vice8565R2,Lemon64;",
 	"P1O[5:4],Aspect Ratio,Original,Full Screen,[ARC1],[ARC2];",
 	"P1O[10:8],Scandoubler Fx,None,HQ2x-320,HQ2x-160,CRT 25%,CRT 50%,CRT 75%;",
+	"P1O[99],Border,Yes,No;",
 	"d1P1O[32],Vertical Crop,No,Yes;",
 	"P1O[31:30],Scale,Normal,V-Integer,Narrower HV-Integer,Wider HV-Integer;",
 	"P1-;",
@@ -1216,6 +1217,7 @@ video_sync sync
 	.vsync(vsync),
 	.ntsc(ntsc),
 	.wide(wide),
+	.noborder(status[99]),
 	.hsync_out(hsync_out),
 	.vsync_out(vsync_out),
 	.hblank(hblank),
